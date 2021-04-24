@@ -1,10 +1,17 @@
+# To do list:
+# - Optimize frame time intervals
+#   - Condense 6571 frames into single .txt file
+#   - Reformat file checking
+# - Multithreading for frame extraction and generation
+
 from PIL import Image
 import cv2
 import sys
-import time
-import playsound
+import shutil
 import os
+import time
 import logging
+import pygame
 
 ASCII_CHARS = ["@", "#", "S", "%", "?", "*", "+", ";", ":", ",", " "]
 
@@ -14,7 +21,12 @@ frame_size = 150
 
 
 def play_audio():
-    playsound.playsound("bad-apple-audio.mp3", block=False)
+    path_to_file = 'bad-apple-audio.mp3'
+    pygame.init()
+    pygame.mixer.pre_init(44100, -16, 2, 2048)
+    pygame.mixer.init()
+    pygame.mixer.music.load(path_to_file)
+    pygame.mixer.music.play()
 
 
 def play_video():
@@ -27,7 +39,7 @@ def play_video():
         # delay_duration = frame_interval * (- 0.05 / 9000 + 1.02) - compute_delay # (golden value)
         # modifier = (-0.04/7500) * frame_number + 1.02
         delay_duration = frame_interval - compute_delay
-        logging.info(str(delay_duration))
+        logging.info(str(compute_delay))
         # print(modifier)
         # print(str(delay_duration))
         if delay_duration < 0:
@@ -60,9 +72,11 @@ def extract_frames(video_path):
     cap.release()
     sys.stdout.write("\nVideo frame extraction completed\n")
 
-# A little note of acknowledgement to AlexRohwer. The following code of converting image frames into ASCII characters is not original, and is
-# based off the code from https://github.com/kiteco/python-youtube-code/blob/master/ascii/ascii_convert.py. As this code repository gains more 
-# traction, I feel that I need to properly source the code. 
+
+# A little note of acknowledgement to AlexRohwer. The following code of converting image frames into ASCII characters
+# is not original, and is based off the code from
+# https://github.com/kiteco/python-youtube-code/blob/master/ascii/ascii_convert.py. As this code repository gains
+# more traction, I feel that I need to properly source the code.
 
 
 # Resize image
@@ -104,17 +118,11 @@ def ascii_generator(image_frame, frame_count):
 # Check if frames have been extracted
 def check_frames():
     if not os.path.exists('ExtractedFrames'):
-            os.makedirs('ExtractedFrames')
-
+        os.makedirs('ExtractedFrames')
     sys.stdout.write("Checking if frames have been extracted...\n")
-    verified_frames = 1
-    for frame_count in range(1, 6572):
-        path_to_file = r'ExtractedFrames/' + 'BadApple_' + str(frame_count) + '.jpg'
-        if os.path.isfile(path_to_file):
-            sys.stdout.write("\r" + path_to_file + " located")
-            verified_frames += 1
-            # sys.stdout.write("\r" + str(verified_frames))
-    if verified_frames > 6000:
+    path = 'ExtractedFrames'
+    verified_frames = len([name for name in os.listdir(path)])
+    if verified_frames == 6571:
         sys.stdout.write("\rFrames found, proceeding to next step\n")
     else:
         sys.stdout.write("\rNot all frames found, extracting frames now\n")
@@ -126,12 +134,9 @@ def check_txt():
     if not os.path.exists('TextFiles'):
         os.makedirs('TextFiles')
     sys.stdout.write("Checking if .txt files have been created...\n")
-    verified_frames = 1
-    for frame_count in range(1, 6572):
-        path_to_file = r'TextFiles/' + 'bad_apple' + str(frame_count) + '.txt'
-        if os.path.isfile(path_to_file):
-            verified_frames += 1
-    if verified_frames > 6000:
+    path = 'TextFiles'
+    verified_frames = len([name for name in os.listdir(path)])
+    if verified_frames == 6571:
         sys.stdout.write("\r.txt files located, proceeding to animation\n")
     else:
         sys.stdout.write("Converting frames to .txt...\n")
@@ -145,22 +150,31 @@ def check_txt():
 
 # Delete extracted frames and .txt files
 def delete_assets():
-    for index in range(1, 6572):
-        # sys.stdout.write("Deleting frames...")
-        frame_name = r"ExtractedFrames/" + "BadApple_" + str(index) + ".jpg"
-        # print(frame_name)
-        try:
-            os.remove(frame_name)
-        except:
-            continue
+    user_input = input("Delete assets? (Y/n): ")
+    user_input.strip().lower()
 
-    for index in range(1, 6572):
-        # sys.stdout.write("Deleting .txt files...")
-        file_name = r"TextFiles/" + "bad_apple" + str(index) + ".txt"
+    image_path = 'ExtractedFrames'
+    text_path = 'TextFiles'
+    if user_input[0] == "y":
         try:
-            os.remove(file_name)
-        except:
-            continue
+            sys.stdout.write('Deleting assets...\n')
+            shutil.rmtree(image_path)
+            sys.stdout.write('Assets deleted\n')
+        except OSError as e:
+            print("Error: %s : %s" % (image_path, e.strerror))
+
+        try:
+            sys.stdout.write('Deleting assets...\n')
+            shutil.rmtree(text_path)
+            sys.stdout.write('Assets deleted\n')
+        except OSError as e:
+            print("Error: %s : %s" % (text_path, e.strerror))
+
+    elif user_input[0] == "n":
+        pass
+
+    else:
+        sys.stdout.write("Invalid option!\n")
 
 
 # Main function
@@ -180,17 +194,15 @@ def main():
         if user_input == '1':
             check_frames()  # Check if image frames have been extracted, extract if necessary
             check_txt()  # Check if .txt files have been created, create if necessary
-            #os.system('color F0')
+            os.system('color F0')
             play_audio()
             logging.info('Started')
             play_video()
             logging.info('Stopped')
-            #os.system('color 07')
+            os.system('color 07')
             continue
         elif user_input == '2':
-            sys.stdout.write('Deleting assets...\n')
             delete_assets()
-            sys.stdout.write('Assets deleted\n')
             continue
         elif user_input == '3':
             exit()
